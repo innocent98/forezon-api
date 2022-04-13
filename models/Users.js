@@ -21,6 +21,18 @@ const UserSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    accountBalance: {
+      type: Number,
+    },
+    investedAmount: {
+      type: Number,
+    },
+    dailyProfit: {
+      type: Number,
+    },
+    totalWithdrawal: {
+      type: Number,
+    },
   },
   { timestamps: true }
 );

@@ -63,6 +63,50 @@ router.post("/register", async (req, res) => {
   }
 });
 
+let refreshTokens = [];
+//generate refresh token
+router.post("/refresh", (req, res) => {
+  //take refresh token from user
+  const refreshToken = req.body.token;
+  // const user = await Users.findOne({ username: req.body.username });
+  //send error if no token or invalid
+  if (!refreshToken)
+    return res.status(401).json({
+      status: "not-authenticated",
+      message: "You are not authenticated!",
+    });
+  if (!refreshTokens.includes(refreshToken)) {
+    return res.status(403).json({ message: "Refresh token is not valid" });
+  }
+  jwt.verify(refreshToken, process.env.JWT_REFRESH_KEY, (err, user) => {
+    err && console.log(err);
+    refreshTokens = refreshTokens.filter((token) => token !== refreshToken);
+
+    //create new access token and refresh token if everything is okay
+    const newAccessToken = generateAccessToken(user);
+    const newRefreshToken = generateRefreshToken(user);
+
+    refreshTokens.push(newRefreshToken);
+
+    res
+      .status(200)
+      .json({ accessToken: newAccessToken, refreshToken: newRefreshToken });
+  });
+});
+
+const generateAccessToken = (user) => {
+  return jwt.sign({ id: user.id, isAdmin: user.isAdmin }, process.env.JWT_KEY, {
+    expiresIn: "30s",
+  });
+};
+const generateRefreshToken = (user) => {
+  return jwt.sign(
+    { id: user.id, isAdmin: user.isAdmin },
+    process.env.JWT_REFRESH_KEY,
+    {}
+  );
+};
+
 //login a user
 router.post("/login", async (req, res) => {
   try {
@@ -72,16 +116,16 @@ router.post("/login", async (req, res) => {
       (await Users.findOne({ username: req.body.username }));
     if (user) {
       if (bcrypt.compareSync(req.body.password, user.password)) {
-        const accessToken = jwt.sign(
-          { id: user.id, isAdmin: user.isAdmin },
-          process.env.JWT_KEY,
-          {
-            expiresIn: "60s",
-          }
-        );
-        res
-          .status(200)
-          .json({ status: "success", user: user, token: accessToken });
+        const accessToken = generateAccessToken(user);
+        const refreshToken = generateRefreshToken(user);
+        refreshTokens.push(refreshToken);
+        // await user.updateOne({ $push: { refreshTokens: refreshToken } });
+        res.status(200).json({
+          status: "success",
+          user: user,
+          accessToken: accessToken,
+          refreshToken: refreshToken,
+        });
       } else {
         res.status(401).json({
           status: "failed",
@@ -96,8 +140,16 @@ router.post("/login", async (req, res) => {
       });
     }
   } catch (err) {
+    console.log(err);
     res.status(500).json({ status: "error", message: "Connection Error!" });
   }
+});
+
+//logout
+router.post("/logout", verify, (req, res) => {
+  const refreshToken = req.body.token;
+  refreshTokens = refreshTokens.filter((token) => token !== refreshToken);
+  res.status(200).json({ message: "You logged out successfully." });
 });
 
 //get registered users
