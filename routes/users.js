@@ -8,12 +8,13 @@ dotenv.config();
 
 //jsonwebtoken
 const verify = (req, res, next) => {
-  const authHeader = req.headers.authorization;
+  const authHeader = req.body.accessToken;
   if (authHeader) {
-    const token = authHeader.split(" ")[1];
+    const token = authHeader;
 
     jwt.verify(token, process.env.JWT_KEY, (err, user) => {
       if (err) {
+        console.log(err);
         return res.status(403).json("token is not valid");
       }
 
@@ -120,14 +121,17 @@ router.post("/login", async (req, res) => {
         const refreshToken = generateRefreshToken(user);
         refreshTokens.push(refreshToken);
         // await user.updateOne({ $push: { refreshTokens: refreshToken } });
+        // const loggedInUser = await user.updateOne({ accessToken: accessToken });
+        // const newUser = await loggedInUser.save()
         res.status(200).json({
           status: "success",
-          user: user,
-          accessToken: accessToken,
+          user,
+          // loggedInUser: loggedInUser.accessToken,
+          accessToken,
           refreshToken: refreshToken,
         });
       } else {
-        res.status(401).json({
+        res.status(400).json({
           status: "failed",
           message: "Incorrect password! please try again.",
         });
@@ -157,7 +161,7 @@ router.get("/", async (req, res) => {
   try {
     const users = await Users.find();
     if (users) {
-      res.status(200).json({ status: "success", users: users });
+      res.status(200).json(users);
     } else {
       res.status(404).json({ status: "not-found", message: "No user found!" });
     }
@@ -171,7 +175,7 @@ router.get("/:id", async (req, res) => {
   try {
     const user = await Users.findById(req.params.id);
     if (user) {
-      res.status(200).json({ status: "success", user: user });
+      res.status(200).json(user);
     } else {
       res.status(404).json({ status: "not-found", message: "User found!" });
     }
@@ -181,8 +185,8 @@ router.get("/:id", async (req, res) => {
 });
 
 //edit a user
-router.put("/:id", verify, async (req, res) => {
-  if (req.user.id === req.params.id || req.user.isAdmin) {
+router.put("/:id", async (req, res) => {
+  if (req.body.userId === req.params.id) {
     try {
       const findUser = await Users.findById(req.params.id);
       if (findUser) {
@@ -208,6 +212,30 @@ router.put("/:id", verify, async (req, res) => {
     res
       .status(403)
       .json({ status: "failed", message: "You cannot perform this action!" });
+  }
+});
+
+//edit a user by admin
+router.put("/edit-user/:id", verify, async (req, res) => {
+  try {
+    const findAdmin = req.user.isAdmin;
+    if (findAdmin) {
+      const user = await Users.findByIdAndUpdate(req.params.id, {
+        $set: req.body,
+      });
+      res.status(200).json({
+        status: "success",
+        message: "Account updated successfully",
+      });
+    } else {
+      res.status(404).json({
+        status: "Not-allowed",
+        message: "You cannot perform this operation!",
+      });
+    }
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ status: "error", message: "Connection Error!" });
   }
 });
 
