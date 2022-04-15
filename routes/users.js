@@ -138,7 +138,7 @@ router.post("/login", async (req, res) => {
     }
   } catch (err) {
     console.log(err);
-    res.status(500).json({ status: "error", message: "Connection Error!" });
+    res.status(500).json(err);
   }
 });
 
