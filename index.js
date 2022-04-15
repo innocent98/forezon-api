@@ -6,6 +6,7 @@ const helmet = require("helmet");
 const dotenv = require("dotenv");
 const mongoose = require("mongoose");
 const router = require("./routes/index");
+const path = require("path")
 
 dotenv.config();
 
@@ -27,6 +28,13 @@ app.use(helmet());
 
 //user router
 app.use(router);
+
+//heroku
+app.use(express.static(path.join(__dirname, "/client/build")));
+
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, "client", "build", 'index.html'));
+});
 
 //server connection
 app.listen(process.env.PORT || 5002, () => {
