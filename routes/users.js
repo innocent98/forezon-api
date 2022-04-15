@@ -69,8 +69,6 @@ let refreshTokens = [];
 router.post("/refresh", (req, res) => {
   //take refresh token from user
   const refreshToken = req.body.token;
-  // const user = await Users.findOne({ username: req.body.username });
-  //send error if no token or invalid
   if (!refreshToken)
     return res.status(401).json({
       status: "not-authenticated",
@@ -97,7 +95,7 @@ router.post("/refresh", (req, res) => {
 
 const generateAccessToken = (user) => {
   return jwt.sign({ id: user.id, isAdmin: user.isAdmin }, process.env.JWT_KEY, {
-    expiresIn: "30s",
+    expiresIn: "3600s",
   });
 };
 const generateRefreshToken = (user) => {
@@ -120,15 +118,11 @@ router.post("/login", async (req, res) => {
         const accessToken = generateAccessToken(user);
         const refreshToken = generateRefreshToken(user);
         refreshTokens.push(refreshToken);
-        // await user.updateOne({ $push: { refreshTokens: refreshToken } });
-        // const loggedInUser = await user.updateOne({ accessToken: accessToken });
-        // const newUser = await loggedInUser.save()
         res.status(200).json({
           status: "success",
           user,
-          // loggedInUser: loggedInUser.accessToken,
           accessToken,
-          refreshToken: refreshToken,
+          refreshToken,
         });
       } else {
         res.status(400).json({
@@ -139,8 +133,7 @@ router.post("/login", async (req, res) => {
     } else {
       res.status(403).json({
         status: "exist",
-        message:
-          "User with the email or username exist!  Please try another one.",
+        message: "User does not exist!  Please register.",
       });
     }
   } catch (err) {
@@ -190,11 +183,9 @@ router.put("/:id", async (req, res) => {
     try {
       const findUser = await Users.findById(req.params.id);
       if (findUser) {
-        const user = await Users.findByIdAndUpdate(
-          req.params.id,
-          { $set: req.body },
-          { new: true }
-        );
+        const user = await Users.findByIdAndUpdate(req.params.id, {
+          $set: req.body,
+        });
         res.status(200).json({
           status: "success",
           message: "Account updated successfully",
@@ -270,29 +261,23 @@ router.put("/:id/password-reset", verify, async (req, res) => {
   }
 });
 
-//delete  a user
-router.delete("/:id", verify, async (req, res) => {
-  if (req.user.id === req.params.id || req.user.isAdmin) {
-    try {
-      const findUser = await Users.findByIdAndDelete(req.params.id);
-      if (findUser) {
-        res.status(200).json({
-          status: "success",
-          message: "User deleted successfully",
-        });
+//delete  a user by an admin
+router.delete("/delete/:id", verify, async (req, res) => {
+  try {
+    const findAdmin = req.user.isAdmin;
+    if (findAdmin) {
+      const user = await Users.findByIdAndDelete(req.params.id);
+      if (user) {
+        res.status(200).json("User deleted successfully");
       } else {
-        res
-          .status(404)
-          .json({ status: "Not-found", message: "User not founnd!" });
+        res.status(404).json("User not found! User might be deleted in previous actions");
       }
-    } catch (err) {
-      console.log(err);
-      res.status(500).json({ status: "error", message: "Connection Error!" });
+    }else{
+      res.status(401).json("You are not authorized")
     }
-  } else {
-    res
-      .status(403)
-      .json({ status: "failed", message: "You cannot perform this action!" });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ status: "error", message: "Connection Error!" });
   }
 });
 
