@@ -116,13 +116,13 @@ router.post("/login", async (req, res) => {
     if (user) {
       if (bcrypt.compareSync(req.body.password, user.password)) {
         const accessToken = generateAccessToken(user);
-        // const refreshToken = generateRefreshToken(user);
-        // refreshTokens.push(refreshToken);
+        const refreshToken = generateRefreshToken(user);
+        refreshTokens.push(refreshToken);
         res.status(200).json({
           status: "success",
           user,
           accessToken,
-          // refreshToken,
+          refreshToken,
         });
       } else {
         res.status(400).json({
