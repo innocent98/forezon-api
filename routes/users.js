@@ -110,7 +110,9 @@ const generateRefreshToken = (user) => {
 router.post("/login", async (req, res) => {
   try {
     //check is a user exist
-    const user = await Users.findOne({ username: req.body.username });
+    const user =
+      (await Users.findOne({ email: req.body.email })) ||
+      (await Users.findOne({ username: req.body.username }));
     if (user) {
       if (bcrypt.compareSync(req.body.password, user.password)) {
         const accessToken = generateAccessToken(user);
@@ -136,7 +138,7 @@ router.post("/login", async (req, res) => {
     }
   } catch (err) {
     console.log(err);
-    res.status(500).json(err);
+    res.status(500).json({ status: "error", message: "Connection Error!" });
   }
 });
 
@@ -268,12 +270,10 @@ router.delete("/delete/:id", verify, async (req, res) => {
       if (user) {
         res.status(200).json("User deleted successfully");
       } else {
-        res
-          .status(404)
-          .json("User not found! User might be deleted in previous actions");
+        res.status(404).json("User not found! User might be deleted in previous actions");
       }
-    } else {
-      res.status(401).json("You are not authorized");
+    }else{
+      res.status(401).json("You are not authorized")
     }
   } catch (err) {
     console.log(err);
