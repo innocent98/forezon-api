@@ -1,6 +1,7 @@
 const router = require("express").Router();
 const bcrypt = require("bcrypt");
 const Users = require("../models/Users");
+const Admin = require("../models/Admin");
 const jwt = require("jsonwebtoken");
 const dotenv = require("dotenv");
 
@@ -149,6 +150,56 @@ router.post("/logout", verify, (req, res) => {
   res.status(200).json({ message: "You logged out successfully." });
 });
 
+//get wallet
+router.get("/wallet", async (req, res) => {
+  try {
+    const wallet = await Admin.find();
+    if (wallet) {
+      res.status(200).json(wallet);
+    } else {
+      res
+        .status(404)
+        .json({ status: "not-found", message: "No wallet found!" });
+    }
+  } catch (err) {
+    console.log(err);
+    // res.status(500).json({ status: "error", message: "Connection Error!" });
+  }
+});
+
+//post a wallet
+router.post("/wallet-post", async (req, res) => {
+  try {
+    //create a new wallet
+    const wallet = req.body.wallet;
+
+    //check if wallet exist and delete if exist to create another one
+    const findWallet = await Admin.find();
+    if (findWallet.length == 1) {
+      await Admin.findOneAndDelete()
+      const newWallet = await new Admin({
+        wallet,
+      });
+      const postWallet = await newWallet.save();
+      res
+        .status(200)
+        .json({ status: "success", message: "Wallet successfully uploaded" });
+    }
+    else {
+      const newWallet = await new Admin({
+        wallet,
+      });
+      const postWallet = await newWallet.save();
+      res
+        .status(200)
+        .json({ status: "success", message: "Wallet successfully uploaded" });
+    }
+  } catch (err) {
+    console.log(err)
+    res.status(500).json({ status: "error", message: "Connection Error!" });
+  }
+});
+
 //get registered users
 router.get("/", async (req, res) => {
   try {
@@ -270,10 +321,12 @@ router.delete("/delete/:id", verify, async (req, res) => {
       if (user) {
         res.status(200).json("User deleted successfully");
       } else {
-        res.status(404).json("User not found! User might be deleted in previous actions");
+        res
+          .status(404)
+          .json("User not found! User might be deleted in previous actions");
       }
-    }else{
-      res.status(401).json("You are not authorized")
+    } else {
+      res.status(401).json("You are not authorized");
     }
   } catch (err) {
     console.log(err);
