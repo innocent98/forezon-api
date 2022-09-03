@@ -10,7 +10,6 @@ const {
   sendWithdrawEmail,
 } = require("../config/notification");
 const Withdraw = require("../models/Withdraw");
-const { reset } = require("nodemon");
 const BootCamp = require("../models/BootCamp");
 
 dotenv.config();
@@ -367,7 +366,7 @@ router.post("/sent", verify, async (req, res) => {
     // future time of 3 days
     const currentTime = new Date();
     const futureDate = new Date(
-      currentTime.setMinutes(currentTime.getMinutes() + 1)
+      currentTime.setHours(currentTime.getHours() + 24)
     );
 
     const sent = await new Deposit({
