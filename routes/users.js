@@ -4,6 +4,14 @@ const Users = require("../models/Users");
 const Admin = require("../models/Admin");
 const jwt = require("jsonwebtoken");
 const dotenv = require("dotenv");
+const Deposit = require("../models/Deposit");
+const {
+  sendConfirmationEmail,
+  sendWithdrawEmail,
+} = require("../config/notification");
+const Withdraw = require("../models/Withdraw");
+const { reset } = require("nodemon");
+const BootCamp = require("../models/BootCamp");
 
 dotenv.config();
 
@@ -95,13 +103,17 @@ router.post("/refresh", (req, res) => {
 });
 
 const generateAccessToken = (user) => {
-  return jwt.sign({ id: user.id, isAdmin: user.isAdmin }, process.env.JWT_KEY, {
-    expiresIn: "3600s",
-  });
+  return jwt.sign(
+    { id: user._id, isAdmin: user.isAdmin },
+    process.env.JWT_KEY,
+    {
+      expiresIn: "1h",
+    }
+  );
 };
 const generateRefreshToken = (user) => {
   return jwt.sign(
-    { id: user.id, isAdmin: user.isAdmin },
+    { id: user._id, isAdmin: user.isAdmin },
     process.env.JWT_REFRESH_KEY,
     {}
   );
@@ -176,7 +188,7 @@ router.post("/wallet-post", async (req, res) => {
     //check if wallet exist and delete if exist to create another one
     const findWallet = await Admin.find();
     if (findWallet.length == 1) {
-      await Admin.findOneAndDelete()
+      await Admin.findOneAndDelete();
       const newWallet = await new Admin({
         wallet,
       });
@@ -184,8 +196,7 @@ router.post("/wallet-post", async (req, res) => {
       res
         .status(200)
         .json({ status: "success", message: "Wallet successfully uploaded" });
-    }
-    else {
+    } else {
       const newWallet = await new Admin({
         wallet,
       });
@@ -195,7 +206,7 @@ router.post("/wallet-post", async (req, res) => {
         .json({ status: "success", message: "Wallet successfully uploaded" });
     }
   } catch (err) {
-    console.log(err)
+    console.log(err);
     res.status(500).json({ status: "error", message: "Connection Error!" });
   }
 });
@@ -218,6 +229,20 @@ router.get("/", async (req, res) => {
 router.get("/:id", async (req, res) => {
   try {
     const user = await Users.findById(req.params.id);
+    if (user) {
+      res.status(200).json(user);
+    } else {
+      res.status(404).json({ status: "not-found", message: "User found!" });
+    }
+  } catch (err) {
+    res.status(500).json({ status: "error", message: "Connection Error!" });
+  }
+});
+
+//get a user
+router.post("/user-single", async (req, res) => {
+  try {
+    const user = await Users.findById(req.body.userId);
     if (user) {
       res.status(200).json(user);
     } else {
@@ -331,6 +356,114 @@ router.delete("/delete/:id", verify, async (req, res) => {
   } catch (err) {
     console.log(err);
     res.status(500).json({ status: "error", message: "Connection Error!" });
+  }
+});
+
+// coin sent
+router.post("/sent", verify, async (req, res) => {
+  try {
+    const user = await Users.findById(req.user.id);
+
+    // future time of 3 days
+    const currentTime = new Date();
+    const futureDate = new Date(
+      currentTime.setMinutes(currentTime.getMinutes() + 1)
+    );
+
+    const sent = await new Deposit({
+      uuid: req.user.username,
+      amount: req.body.amount,
+    });
+    await user.updateOne({ time: futureDate });
+    await sent.save();
+    res
+      .status(200)
+      .json(
+        "Payment received! Your account will be credited as soon as we validate your payment."
+      );
+    sendConfirmationEmail(
+      (username = user.username),
+      (amount = req.body.amount)
+    );
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ status: "error", message: "Connection Error!" });
+  }
+});
+
+// update user investment by 10% every 3days
+router.put("/percent/update", async (req, res) => {
+  const user = await Users.findById(req.body.userId);
+
+  let time = user.time;
+  const currentTime = new Date();
+  const totalSeconds = (currentTime - time) / 1000;
+  const futureDate = new Date(
+    currentTime.setHours(currentTime.getHours() + 24)
+  );
+
+  if (user) {
+    if (totalSeconds >= 0) {
+      let invested = user.investedAmount;
+      // calculate percentage
+      let percentage = invested * 10;
+      let p = percentage / 100;
+      console.log(p);
+      // for (i = p; i >= 1; i++) {
+      await user.updateOne({ $inc: { dailyProfit: +p } });
+      await user.updateOne({ $inc: { accountBalance: +p } });
+      await user.updateOne({ time: futureDate });
+      // break;
+      // }
+      res.status(200).json("Success");
+    } else {
+      res.status(403).json("Currently on!");
+    }
+  }
+});
+
+// withraw
+router.put("/withdraw/fund", async (req, res) => {
+  try {
+    const user = await Users.findById(req.body.userId);
+    if (user.accountBalance >= req.body.amount) {
+      const withdraw = await new Withdraw({
+        uuid: req.body.username,
+        wallet: req.body.wallet,
+        amount: req.body.amount,
+      });
+      let withdrawAmount = req.body.amount;
+      for (i = withdrawAmount; i >= 1; i++) {
+        await user.updateOne({ $inc: { accountBalance: -i } });
+        await user.updateOne({ $inc: { totalWithdrawal: +i } });
+        break;
+      }
+      await withdraw.save();
+      res
+        .status(200)
+        .json("Withdrawal successful, you will be credited shortly.");
+      sendWithdrawEmail((username = user.username), (amount = req.body.amount));
+    } else {
+      res.status(403).json("Insufficient balance");
+    }
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ status: "error", message: "Connection Error!" });
+  }
+});
+
+// accept members for bootcamp
+router.post("/bootcamp-register", async (req, res) => {
+  try {
+    const newMember = await new BootCamp({
+      email: req.body.email,
+    });
+    await newMember.save();
+    res
+      .status(200)
+      .json("Thanks for showing interest! We have received your email");
+  } catch (err) {
+    res.status(500).json("Connection error!");
   }
 });
 

@@ -15,7 +15,9 @@ const UserSchema = new mongoose.Schema(
     password: {
       type: String,
       required: true,
-      unique: true,
+    },
+    referral: {
+      type: String,
     },
     isAdmin: {
       type: Boolean,
@@ -39,6 +41,10 @@ const UserSchema = new mongoose.Schema(
     },
     accessToken: {
       type: String,
+    },
+    time: {
+      type: Number,
+      default: 0,
     },
   },
   { timestamps: true }
