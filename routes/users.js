@@ -363,7 +363,7 @@ router.post("/sent", verify, async (req, res) => {
   try {
     const user = await Users.findById(req.user.id);
 
-    // future time of 3 days
+    // future time
     const currentTime = new Date();
     const futureDate = new Date(
       currentTime.setHours(currentTime.getHours() + 24)
@@ -378,7 +378,7 @@ router.post("/sent", verify, async (req, res) => {
     res
       .status(200)
       .json(
-        "Payment received! Your account will be credited as soon as we validate your payment."
+        "Payment successful! Your account will be credited as soon as we validate your payment."
       );
     sendConfirmationEmail(
       (username = user.username),
@@ -390,7 +390,7 @@ router.post("/sent", verify, async (req, res) => {
   }
 });
 
-// update user investment by 10% every 3days
+// update user investment by 10% every 24hrs
 router.put("/percent/update", async (req, res) => {
   const user = await Users.findById(req.body.userId);
 
@@ -405,15 +405,14 @@ router.put("/percent/update", async (req, res) => {
     if (totalSeconds >= 0) {
       let invested = user.investedAmount;
       // calculate percentage
-      let percentage = invested * 10;
-      let p = percentage / 100;
-      console.log(p);
-      // for (i = p; i >= 1; i++) {
-      await user.updateOne({ $inc: { dailyProfit: +p } });
-      await user.updateOne({ $inc: { accountBalance: +p } });
-      await user.updateOne({ time: futureDate });
-      // break;
-      // }
+      let percentage = (invested * 10) / 100;
+      // let p = percentage / 100;
+      for (i = percentage; i >= 1; i++) {
+        await user.updateOne({ $inc: { dailyProfit: +i } });
+        await user.updateOne({ $inc: { accountBalance: +i } });
+        await user.updateOne({ time: futureDate });
+        break;
+      }
       res.status(200).json("Success");
     } else {
       res.status(403).json("Currently on!");
@@ -465,5 +464,15 @@ router.post("/bootcamp-register", async (req, res) => {
     res.status(500).json("Connection error!");
   }
 });
+
+// get bootcamp members
+router.get("/get/boot-camp", async (req, res)=>{
+  try {
+    const findMembers = await BootCamp.find()
+    res.status(200).json(findMembers)
+  } catch (err) {
+    res.status(500).json({ status: "error", message: "Connection Error!" });
+  }
+})
 
 module.exports = router;
